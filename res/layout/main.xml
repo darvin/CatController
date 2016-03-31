@@ -4,10 +4,19 @@
               android:layout_width="fill_parent"
               android:layout_height="fill_parent"
 >
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+              android:textAppearance="?android:attr/textAppearanceMedium" android:text="BLE Relay Status"
+              android:id="@+id/bleStatusTextView" android:layout_gravity="right"/>
     <TextView
-            android:layout_width="fill_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Hello World, MainActivity"
-    />
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="WaterStatus"
+            android:id="@+id/waterStatusTextView" android:layout_gravity="right"/>
+    <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Turn On Water"
+            android:id="@+id/buttonWaterTurnOn" android:onClick="buttonTurnOnPressed"/>
 </LinearLayout>
 
