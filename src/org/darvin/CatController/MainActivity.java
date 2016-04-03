@@ -1,15 +1,12 @@
 package org.darvin.CatController;
 
 import android.app.Activity;
-import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.*;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ExpandableListView;
 import android.widget.TextView;
 
@@ -29,7 +26,7 @@ public class MainActivity extends Activity {
         setContentView(R.layout.main);
         bleStatusTextView = (TextView)findViewById(R.id.bleStatusTextView);
         waterStatusTextView = (TextView)findViewById(R.id.waterStatusTextView);
-        Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
+        Intent gattServiceIntent = new Intent(this, BLESwitchService.class);
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
         if (mDeviceAddress==null) {
             bleStatusTextView.setText("Not Connected");
@@ -71,7 +68,7 @@ public class MainActivity extends Activity {
 
         waterStatusTextView.setText("Trying to turn on...");
         mWaterSwitch = !mWaterSwitch;
-        mBluetoothLeService.turnSwitch(0, mWaterSwitch);
+        mBLESwitchService.turnSwitch(0, mWaterSwitch);
 
 
     }
@@ -82,7 +79,7 @@ public class MainActivity extends Activity {
     private String mDeviceName;
     private String mDeviceAddress;
     private ExpandableListView mGattServicesList;
-    private BluetoothLeService mBluetoothLeService;
+    private BLESwitchService mBLESwitchService;
     private ArrayList<ArrayList<BluetoothGattCharacteristic>> mGattCharacteristics =
             new ArrayList<ArrayList<BluetoothGattCharacteristic>>();
     private boolean mConnected = false;
@@ -96,18 +93,18 @@ public class MainActivity extends Activity {
 
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder service) {
-            mBluetoothLeService = ((BluetoothLeService.LocalBinder) service).getService();
-            if (!mBluetoothLeService.initialize()) {
+            mBLESwitchService = ((BLESwitchService.LocalBinder) service).getService();
+            if (!mBLESwitchService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
                 finish();
             }
             // Automatically connects to the device upon successful start-up initialization.
-            mBluetoothLeService.connect(mDeviceAddress);
+            mBLESwitchService.connect(mDeviceAddress);
         }
 
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
-            mBluetoothLeService = null;
+            mBLESwitchService = null;
         }
     };
 
@@ -121,27 +118,27 @@ public class MainActivity extends Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
-            if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
+            if (BLESwitchService.ACTION_GATT_CONNECTED.equals(action)) {
                 mConnected = true;
                 bleStatusTextView.setText("Connected");
 
                 invalidateOptionsMenu();
-            } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
+            } else if (BLESwitchService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 mConnected = false;
                 bleStatusTextView.setText("Disconnected");
                 invalidateOptionsMenu();
-            } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
+            } else if (BLESwitchService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 // Show all the supported services and characteristics on the user interface.
-            } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
-//                displayData(intent.getStringExtra(BluetoothLeService.EXTRA_DATA));
+            } else if (BLESwitchService.ACTION_DATA_AVAILABLE.equals(action)) {
+//                displayData(intent.getStringExtra(BLESwitchService.EXTRA_DATA));
             }
         }
     };
 
 
     private void connectToBle(){
-        if (mBluetoothLeService != null) {
-            final boolean result = mBluetoothLeService.connect(mDeviceAddress);
+        if (mBLESwitchService != null) {
+            final boolean result = mBLESwitchService.connect(mDeviceAddress);
             Log.d(TAG, "Connect request result=" + result);
         }
 
@@ -164,16 +161,16 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         unbindService(mServiceConnection);
-        mBluetoothLeService = null;
+        mBLESwitchService = null;
     }
 
 
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
-        intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
+        intentFilter.addAction(BLESwitchService.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(BLESwitchService.ACTION_GATT_DISCONNECTED);
+        intentFilter.addAction(BLESwitchService.ACTION_GATT_SERVICES_DISCOVERED);
+        intentFilter.addAction(BLESwitchService.ACTION_DATA_AVAILABLE);
         return intentFilter;
     }
 
