@@ -17,6 +17,10 @@ public class MainActivity extends Activity {
     private boolean mWaterSwitch;
     public TextView bleStatusTextView;
     public TextView waterStatusTextView;
+    private String MyPREFERENCES = "MyPREFERENCES";
+    private String PREFERENCES_BLE_SWITCH_ADDRESS = "PREFERENCES_BLE_SWITCH_ADDRESS";
+    private String PREFERENCES_BLE_SWITCH_NAME = "PREFERENCES_BLE_SWITCH_NAME";
+
     /**
      * Called when the activity is first created.
      */
@@ -28,12 +32,11 @@ public class MainActivity extends Activity {
         waterStatusTextView = (TextView)findViewById(R.id.waterStatusTextView);
         Intent gattServiceIntent = new Intent(this, BLESwitchService.class);
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
-        if (mDeviceAddress==null) {
-            bleStatusTextView.setText("Not Connected");
-            final Intent intent = new Intent(this, DeviceScanActivity.class);
-            startActivityForResult(intent, SCAN_BLE_DEVICES_REQUEST);
 
-        }
+        SharedPreferences sharedpreferences = getSharedPreferences(MyPREFERENCES, Context.MODE_PRIVATE);
+        mDeviceAddress = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_ADDRESS, null);
+        mDeviceName = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
+
 
     }
 
@@ -54,6 +57,11 @@ public class MainActivity extends Activity {
                 mDeviceAddress = data.getStringExtra(DeviceScanActivity.EXTRAS_DEVICE_ADDRESS);
                 mDeviceName = data.getStringExtra(DeviceScanActivity.EXTRAS_DEVICE_NAME);
                 bleStatusTextView.setText("Connecting to "+mDeviceName);
+                SharedPreferences sharedpreferences = getSharedPreferences(MyPREFERENCES, Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = sharedpreferences.edit();
+                editor.putString(PREFERENCES_BLE_SWITCH_ADDRESS, mDeviceAddress);
+                editor.commit();
+                mBLESwitchService.connect(mDeviceAddress);
 
             }
         }
@@ -98,8 +106,16 @@ public class MainActivity extends Activity {
                 Log.e(TAG, "Unable to initialize Bluetooth");
                 finish();
             }
-            // Automatically connects to the device upon successful start-up initialization.
-            mBLESwitchService.connect(mDeviceAddress);
+
+            if (mDeviceAddress==null) {
+                bleStatusTextView.setText("Not Connected");
+                final Intent intent = new Intent(MainActivity.this, DeviceScanActivity.class);
+                startActivityForResult(intent, SCAN_BLE_DEVICES_REQUEST);
+            } else {
+                mBLESwitchService.connect(mDeviceAddress);
+
+            }
+
         }
 
         @Override
