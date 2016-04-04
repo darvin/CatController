@@ -7,6 +7,7 @@ import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -43,6 +44,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private String MyPREFERENCES = "MyPREFERENCES";
     private String PREFERENCES_BLE_SWITCH_ADDRESS = "PREFERENCES_BLE_SWITCH_ADDRESS";
     private String PREFERENCES_BLE_SWITCH_NAME = "PREFERENCES_BLE_SWITCH_NAME";
+    private String PREFERENCES_CAT1_TRAIN = "PREFERENCES_CAT1_TRAIN";
     private CameraBridgeViewBase mCameraView;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -88,6 +90,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         SharedPreferences sharedpreferences = getSharedPreferences(MyPREFERENCES, Context.MODE_PRIVATE);
         mDeviceAddress = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_ADDRESS, null);
         mDeviceName = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
+        String cat1HistogramBase64 = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
+        if (cat1HistogramBase64!=null) {
+            try {
+                cat1historam = SerializationUtils.matFromJson(cat1HistogramBase64);
+            } catch (Exception e) {
+
+            }
+        }
+
 
 
 //        Camera camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
@@ -112,6 +123,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
 
         timerHandler.postDelayed(timerRunnable, 3000);
+
+
 
 
     }
@@ -371,10 +384,22 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
             Log.d(TAG, "CAT TRAINING");
 
+
+            SharedPreferences sharedpreferences = getSharedPreferences(MyPREFERENCES, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedpreferences.edit();
+            try {
+                editor.putString(PREFERENCES_CAT1_TRAIN, SerializationUtils.matToJson(cat1historam));
+
+            } catch (Exception e) {
+
+            }
+            editor.commit();
+
+
         } else {
             if (cat1historam != null) {
                 double compResult = Imgproc.compareHist(cat1historam, normalizedHist, Imgproc.CV_COMP_CORREL);
-                boolean catDetected = compResult>0.5;
+                boolean catDetected = compResult>0.8;
                 Log.d(TAG, "CAT DETECTED: "+catDetected + " correlation: "+compResult);
 
                 if (catDetected) {
