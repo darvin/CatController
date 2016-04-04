@@ -161,6 +161,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
 
     public void buttonTurnOnPressed(View view) {
+        if (mCameraView != null)
+            mCameraView.disableView();
+        timerHandler.removeCallbacks(timerRunnable);
+
+        
         waterStatusTextView.setText("Trying to turn on...");
         setWaterSwitch(!mWaterSwitch);
     }
