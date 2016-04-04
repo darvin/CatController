@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/CatController.iml" filepath="$PROJECT_DIR$/CatController.iml" />
+      <module fileurl="file://$PROJECT_DIR$/OpenCV-android-sdk/sdk/java/OpenCV Library - 3.1.0.iml" filepath="$PROJECT_DIR$/OpenCV-android-sdk/sdk/java/OpenCV Library - 3.1.0.iml" />
     </modules>
   </component>
 </project>

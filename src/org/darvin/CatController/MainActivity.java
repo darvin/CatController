@@ -12,7 +12,13 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 
-public class MainActivity extends Activity {
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
+
+public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
     private static final String TAG = "MainActivity";
     private boolean mWaterSwitch;
     public TextView bleStatusTextView;
@@ -20,13 +26,39 @@ public class MainActivity extends Activity {
     private String MyPREFERENCES = "MyPREFERENCES";
     private String PREFERENCES_BLE_SWITCH_ADDRESS = "PREFERENCES_BLE_SWITCH_ADDRESS";
     private String PREFERENCES_BLE_SWITCH_NAME = "PREFERENCES_BLE_SWITCH_NAME";
+    private CameraBridgeViewBase mCameraView;
+    private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
+        @Override
+        public void onManagerConnected(int status) {
+            switch (status) {
+                case LoaderCallbackInterface.SUCCESS:
+                {
+                    Log.i(TAG, "OpenCV loaded successfully");
 
+                    // Load native library after(!) OpenCV initialization
+//                    System.loadLibrary("mixed_sample");
+
+                    mCameraView.enableView();
+                } break;
+                default:
+                {
+                    super.onManagerConnected(status);
+                } break;
+            }
+        }
+    };
     /**
      * Called when the activity is first created.
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (!OpenCVLoader.initDebug()) {
+            Log.e(this.getClass().getSimpleName(), "  OpenCVLoader.initDebug(), not working.");
+        } else {
+            Log.d(this.getClass().getSimpleName(), "  OpenCVLoader.initDebug(), working.");
+        }
+
         setContentView(R.layout.main);
         bleStatusTextView = (TextView)findViewById(R.id.bleStatusTextView);
         waterStatusTextView = (TextView)findViewById(R.id.waterStatusTextView);
@@ -36,6 +68,14 @@ public class MainActivity extends Activity {
         SharedPreferences sharedpreferences = getSharedPreferences(MyPREFERENCES, Context.MODE_PRIVATE);
         mDeviceAddress = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_ADDRESS, null);
         mDeviceName = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
+
+
+
+        mCameraView = (CameraBridgeViewBase) findViewById(R.id.cameraView);
+        mCameraView.setCameraIndex(1);
+
+        mCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
+        mCameraView.setCvCameraViewListener(this);
 
 
     }
@@ -165,12 +205,26 @@ public class MainActivity extends Activity {
         super.onResume();
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
         connectToBle();
+
+
+        if (!OpenCVLoader.initDebug()) {
+            Log.d(TAG, "Internal OpenCV library not found. Using OpenCV Manager for initialization");
+            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this, mLoaderCallback);
+        } else {
+            Log.d(TAG, "OpenCV library found inside package. Using it!");
+            mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+        }
+
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         unregisterReceiver(mGattUpdateReceiver);
+
+        if (mCameraView != null)
+            mCameraView.disableView();
+
     }
 
     @Override
@@ -178,6 +232,10 @@ public class MainActivity extends Activity {
         super.onDestroy();
         unbindService(mServiceConnection);
         mBLESwitchService = null;
+
+        if (mCameraView != null)
+            mCameraView.disableView();
+
     }
 
 
@@ -191,4 +249,18 @@ public class MainActivity extends Activity {
     }
 
 
+    @Override
+    public void onCameraViewStarted(int width, int height) {
+
+    }
+
+    @Override
+    public void onCameraViewStopped() {
+
+    }
+
+    @Override
+    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        return inputFrame.rgba();
+    }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/../../sdk/java/OpenCV Library - 3.1.0.iml" filepath="$PROJECT_DIR$/../../sdk/java/OpenCV Library - 3.1.0.iml" />
+      <module fileurl="file://$PROJECT_DIR$/OpenCV Tutorial 2 - Mixed Processing.iml" filepath="$PROJECT_DIR$/OpenCV Tutorial 2 - Mixed Processing.iml" />
+    </modules>
+  </component>
+</project>
