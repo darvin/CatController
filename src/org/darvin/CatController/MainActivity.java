@@ -17,6 +17,8 @@ import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Mat;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
 
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
     private static final String TAG = "MainActivity";
@@ -36,7 +38,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     Log.i(TAG, "OpenCV loaded successfully");
 
                     // Load native library after(!) OpenCV initialization
-                    System.loadLibrary("cat_controller_opencv");
+//                    System.loadLibrary("cat_controller_opencv");
 
                     mCameraView.enableView();
                 } break;
@@ -263,13 +265,16 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Mat mRgba = inputFrame.rgba();
         Mat mGray = inputFrame.gray();
-        FindFeatures(mGray.getNativeObjAddr(), mRgba.getNativeObjAddr());
+        double downscale = 0.3;
 
+        Mat downscaled = new Mat(new Size(mGray.size().width*downscale, mGray.size().height*downscale), mGray.type());
+        Imgproc.resize(mGray, downscaled, downscaled.size());
+        Mat blurred = new Mat(downscaled.size(), downscaled.type());
+        Imgproc.GaussianBlur(downscaled, blurred, new Size(21, 21), 0);
 
-        return mRgba;
+        return blurred;
     }
 
 
-    public native void FindFeatures(long matAddrGr, long matAddrRgba);
 
 }
