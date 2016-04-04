@@ -16,7 +16,7 @@
     <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Turn On Water"
+            android:text="Turn Off Water"
             android:id="@+id/buttonWaterTurnOn" android:onClick="buttonTurnOnPressed"/>
     <org.opencv.android.JavaCameraView
             android:layout_width="match_parent"

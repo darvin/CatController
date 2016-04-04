@@ -3,8 +3,8 @@ package org.darvin.CatController;
 import android.app.Activity;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.*;
-import android.hardware.Camera;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
@@ -15,22 +15,21 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.SynchronousQueue;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfFloat;
-import org.opencv.core.MatOfInt;
-import org.opencv.core.Size;
+import org.opencv.core.*;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.video.BackgroundSubtractor;
 import org.opencv.video.BackgroundSubtractorMOG2;
 import org.opencv.video.Video;
 
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
     private static final String TAG = "MainActivity";
-    private boolean mWaterSwitch;
+    private boolean mWaterSwitch = true;
     private boolean mTrainCat1;
     public TextView bleStatusTextView;
     public TextView waterStatusTextView;
@@ -38,6 +37,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Button mWaterButton;
     public Button mTrainCat1Button;
 
+    private long WATER_TIMEOUT = 3000;
+    private long mLastTimeCatSeen = System.currentTimeMillis();
     private String MyPREFERENCES = "MyPREFERENCES";
     private String PREFERENCES_BLE_SWITCH_ADDRESS = "PREFERENCES_BLE_SWITCH_ADDRESS";
     private String PREFERENCES_BLE_SWITCH_NAME = "PREFERENCES_BLE_SWITCH_NAME";
@@ -102,6 +103,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         mCameraView.setCvCameraViewListener(this);
 
 
+        timerHandler.postDelayed(timerRunnable, 3000);
+
+
     }
 
 
@@ -137,16 +141,42 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     public void buttonTurnOnPressed(View view) {
         waterStatusTextView.setText("Trying to turn on...");
-        mWaterSwitch = !mWaterSwitch;
-        mWaterButton.setText(mWaterSwitch? "Turn Off Water": "Turn On Water");
-        mBLESwitchService.turnSwitch(0, mWaterSwitch);
+        setWaterSwitch(!mWaterSwitch);
+    }
+
+    private  void setWaterSwitch(boolean state) {
+        if (state!=mWaterSwitch) {
+            Log.d(TAG, "Setting water switch: "+state);
+            mWaterSwitch = state;
+            mWaterButton.setText(mWaterSwitch? "Turn Off Water": "Turn On Water");
+            mBLESwitchService.turnSwitch(0, mWaterSwitch);
+
+        }
     }
 
     public void buttonTrainCat1Pressed(View view) {
         mTrainCat1 = !mTrainCat1;
-        mWaterButton.setText(mTrainCat1? "Stop Training Cat 1": "Train Cat 1");
+        mTrainCat1Button.setText(mTrainCat1? "Stop Training Cat 1": "Train Cat 1");
     }
 
+
+
+
+
+    Handler timerHandler = new Handler();
+
+    Runnable timerRunnable = new Runnable() {
+
+        @Override
+        public void run() {
+            if (System.currentTimeMillis()>(mLastTimeCatSeen+WATER_TIMEOUT)) {
+                setWaterSwitch(false);
+            } else {
+                setWaterSwitch(true);
+            }
+            timerHandler.postDelayed(this, 500);
+        }
+    };
 
 
     private String mDeviceName;
@@ -273,11 +303,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return intentFilter;
     }
 
-    BackgroundSubtractorMOG2 mBackgroundSubstractor;
+    BackgroundSubtractor mBackgroundSubstractor;
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-        mBackgroundSubstractor = Video.createBackgroundSubtractorMOG2(50, 16, false);
+        mBackgroundSubstractor = Video.createBackgroundSubtractorKNN(200, 400, false);
+//        mBackgroundSubstractor = Video.createBackgroundSubtractorMOG2(50, 16, false);
     }
 
     @Override
@@ -286,26 +317,57 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     }
 
 
+    Mat cat1historam = null;
+
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Mat orig = inputFrame.rgba();
-        Mat blurred = new Mat(orig.size(), orig.type());
-        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
+        Mat grey = inputFrame.gray();
+//        Mat blurred = new Mat(orig.size(), orig.type());
+//        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
+//        Mat equalized = new Mat(orig.size(), orig.type());
 
-        Mat mask = new Mat(orig.size(), orig.type());
-        mBackgroundSubstractor.apply(blurred, mask);
+//        Imgproc.equalizeHist(orig, equalized);
+
+        Mat mask = new Mat(grey.size(), grey.type());
+        mBackgroundSubstractor.apply(grey, mask);
 
 
         List<Mat> matList = new ArrayList<Mat>(Arrays.asList(orig));
         Mat histogram = new Mat();
         Imgproc.calcHist(
                 matList,
-                new MatOfInt(0),
+                new MatOfInt(0,1,2),
                 mask,
                 histogram ,
-                new MatOfInt(25),
-                new MatOfFloat(0, 256));
-        System.out.println("histogram\n"+histogram.dump());
+                new MatOfInt(8,8,8),
+                new MatOfFloat(0, 256, 0, 256, 0, 256));
+
+        Mat normalizedHist = new Mat();
+        Core.normalize(histogram, normalizedHist);
+
+        if (mTrainCat1) {
+            cat1historam = normalizedHist;
+
+            Log.d(TAG, "CAT TRAINING");
+
+        } else {
+            if (cat1historam != null) {
+                double compResult = Imgproc.compareHist(cat1historam, normalizedHist, Imgproc.CV_COMP_CORREL);
+                boolean catDetected = compResult>0.5;
+                Log.d(TAG, "CAT DETECTED: "+catDetected + " correlation: "+compResult);
+
+                if (catDetected) {
+                    mLastTimeCatSeen = System.currentTimeMillis();
+                }
+            } else {
+                Log.d(TAG, "CAT CANNOT BE DETECTED, TRAIN FIRST");
+
+            }
+
+        }
+
+
 
         Mat masked = new Mat(orig.size(), orig.type());
         orig.copyTo(masked, mask);
