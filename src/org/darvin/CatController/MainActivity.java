@@ -3,28 +3,41 @@ package org.darvin.CatController;
 import android.app.Activity;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.*;
+import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ExpandableListView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfFloat;
+import org.opencv.core.MatOfInt;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.video.BackgroundSubtractorMOG2;
+import org.opencv.video.Video;
 
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
     private static final String TAG = "MainActivity";
     private boolean mWaterSwitch;
+    private boolean mTrainCat1;
     public TextView bleStatusTextView;
     public TextView waterStatusTextView;
+
+    public Button mWaterButton;
+    public Button mTrainCat1Button;
+
     private String MyPREFERENCES = "MyPREFERENCES";
     private String PREFERENCES_BLE_SWITCH_ADDRESS = "PREFERENCES_BLE_SWITCH_ADDRESS";
     private String PREFERENCES_BLE_SWITCH_NAME = "PREFERENCES_BLE_SWITCH_NAME";
@@ -64,6 +77,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         setContentView(R.layout.main);
         bleStatusTextView = (TextView)findViewById(R.id.bleStatusTextView);
         waterStatusTextView = (TextView)findViewById(R.id.waterStatusTextView);
+        mWaterButton = (Button) findViewById(R.id.buttonWaterTurnOn);
+        mTrainCat1Button = (Button) findViewById(R.id.trainCat1Button);
+
         Intent gattServiceIntent = new Intent(this, BLESwitchService.class);
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
 
@@ -72,9 +88,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         mDeviceName = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
 
 
-
         mCameraView = (CameraBridgeViewBase) findViewById(R.id.cameraView);
         mCameraView.setCameraIndex(1);
+
+        int width = 800;
+        int height = 600;
+        mCameraView.setMaxFrameSize(width, height);
+//        mCameraView.getHolder().setFixedSize(900, 900);
+
+
 
         mCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
         mCameraView.setCvCameraViewListener(this);
@@ -114,15 +136,16 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
 
     public void buttonTurnOnPressed(View view) {
-        Log.v(TAG, "button pressed");
-
         waterStatusTextView.setText("Trying to turn on...");
         mWaterSwitch = !mWaterSwitch;
+        mWaterButton.setText(mWaterSwitch? "Turn Off Water": "Turn On Water");
         mBLESwitchService.turnSwitch(0, mWaterSwitch);
-
-
     }
 
+    public void buttonTrainCat1Pressed(View view) {
+        mTrainCat1 = !mTrainCat1;
+        mWaterButton.setText(mTrainCat1? "Stop Training Cat 1": "Train Cat 1");
+    }
 
 
 
@@ -250,10 +273,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return intentFilter;
     }
 
+    BackgroundSubtractorMOG2 mBackgroundSubstractor;
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-
+        mBackgroundSubstractor = Video.createBackgroundSubtractorMOG2(50, 16, false);
     }
 
     @Override
@@ -261,18 +285,32 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     }
 
+
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Mat mRgba = inputFrame.rgba();
-        Mat mGray = inputFrame.gray();
-        double downscale = 0.3;
+        Mat orig = inputFrame.rgba();
+        Mat blurred = new Mat(orig.size(), orig.type());
+        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
 
-        Mat downscaled = new Mat(new Size(mGray.size().width*downscale, mGray.size().height*downscale), mGray.type());
-        Imgproc.resize(mGray, downscaled, downscaled.size());
-        Mat blurred = new Mat(downscaled.size(), downscaled.type());
-        Imgproc.GaussianBlur(downscaled, blurred, new Size(21, 21), 0);
+        Mat mask = new Mat(orig.size(), orig.type());
+        mBackgroundSubstractor.apply(blurred, mask);
 
-        return blurred;
+
+        List<Mat> matList = new ArrayList<Mat>(Arrays.asList(orig));
+        Mat histogram = new Mat();
+        Imgproc.calcHist(
+                matList,
+                new MatOfInt(0),
+                mask,
+                histogram ,
+                new MatOfInt(25),
+                new MatOfFloat(0, 256));
+        System.out.println("histogram\n"+histogram.dump());
+
+        Mat masked = new Mat(orig.size(), orig.type());
+        orig.copyTo(masked, mask);
+
+        return masked;
     }
 
 

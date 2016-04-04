@@ -21,6 +21,11 @@
     <org.opencv.android.JavaCameraView
             android:layout_width="match_parent"
             android:layout_height="wrap_content" android:id="@+id/cameraView"
-            android:layout_weight="1.04"/>
+            android:layout_weight="1.00"/>
+    <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Train Cat 1"
+            android:id="@+id/trainCat1Button" android:layout_gravity="right" android:onClick="buttonTrainCat1Pressed"/>
 </LinearLayout>
 
