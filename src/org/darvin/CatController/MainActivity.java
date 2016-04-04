@@ -36,7 +36,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     Log.i(TAG, "OpenCV loaded successfully");
 
                     // Load native library after(!) OpenCV initialization
-//                    System.loadLibrary("mixed_sample");
+                    System.loadLibrary("cat_controller_opencv");
 
                     mCameraView.enableView();
                 } break;
@@ -261,6 +261,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        return inputFrame.rgba();
+        Mat mRgba = inputFrame.rgba();
+        Mat mGray = inputFrame.gray();
+        FindFeatures(mGray.getNativeObjAddr(), mRgba.getNativeObjAddr());
+
+
+        return mRgba;
     }
+
+
+    public native void FindFeatures(long matAddrGr, long matAddrRgba);
+
 }
