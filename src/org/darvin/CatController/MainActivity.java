@@ -3,6 +3,7 @@ package org.darvin.CatController;
 import android.app.Activity;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.*;
+import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -89,6 +90,13 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         mDeviceName = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
 
 
+//        Camera camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+//
+//        Camera.Parameters param = camera.getParameters();
+//        List fpslist = param.getSupportedPreviewFpsRange();
+//        Log.d(TAG, "size= " + fpslist.size());
+
+
         mCameraView = (CameraBridgeViewBase) findViewById(R.id.cameraView);
         mCameraView.setCameraIndex(1);
 
@@ -149,7 +157,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             Log.d(TAG, "Setting water switch: "+state);
             mWaterSwitch = state;
             mWaterButton.setText(mWaterSwitch? "Turn Off Water": "Turn On Water");
-            mBLESwitchService.turnSwitch(0, mWaterSwitch);
+            mBLESwitchService.turnSwitch(0, !mWaterSwitch);
 
         }
     }
@@ -307,7 +315,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-        mBackgroundSubstractor = Video.createBackgroundSubtractorKNN(200, 400, false);
+        mBackgroundSubstractor = Video.createBackgroundSubtractorKNN(100, 400, false);
 //        mBackgroundSubstractor = Video.createBackgroundSubtractorMOG2(50, 16, false);
     }
 
@@ -319,8 +327,20 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     Mat cat1historam = null;
 
+    long lastFrameProcessed = System.currentTimeMillis();
+    long PROCESS_EVERY = 500;
+    Mat lastFrame = null;
+
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        if (System.currentTimeMillis()<(lastFrameProcessed+PROCESS_EVERY)){
+            if (lastFrame!=null) {
+                return lastFrame;
+            } else {
+                return inputFrame.rgba();
+            }
+        }
+        lastFrameProcessed = System.currentTimeMillis();
         Mat orig = inputFrame.rgba();
         Mat grey = inputFrame.gray();
 //        Mat blurred = new Mat(orig.size(), orig.type());
@@ -371,7 +391,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
         Mat masked = new Mat(orig.size(), orig.type());
         orig.copyTo(masked, mask);
-
+        lastFrame = masked;
         return masked;
     }
 
