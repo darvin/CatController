@@ -30,10 +30,9 @@ import org.opencv.video.BackgroundSubtractor;
 import org.opencv.video.BackgroundSubtractorMOG2;
 import org.opencv.video.Video;
 
-public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
+public class MainActivity extends Activity implements CatDetector.OnCatDetectedListener {
     private static final String TAG = "MainActivity";
     private boolean mWaterSwitch = true;
-    private boolean mTrainCat1;
     public TextView bleStatusTextView;
     public TextView waterStatusTextView;
 
@@ -47,6 +46,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private String PREFERENCES_BLE_SWITCH_NAME = "PREFERENCES_BLE_SWITCH_NAME";
     private String PREFERENCES_CAT1_TRAIN = "PREFERENCES_CAT1_TRAIN";
     private CameraBridgeViewBase mCameraView;
+    private CatDetector mCatDetector;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -92,14 +92,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         mDeviceAddress = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_ADDRESS, null);
         mDeviceName = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
         String cat1HistogramBase64 = sharedpreferences.getString(PREFERENCES_CAT1_TRAIN, null);
-        if (cat1HistogramBase64!=null) {
-            try {
-                cat1historam = SerializationUtils.matFromJson(cat1HistogramBase64);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-        }
-
+        mCatDetector = new CatDetector(cat1HistogramBase64);
+        mCatDetector.setCatDetectedListener(this);
 
 
 //        Camera camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
@@ -120,7 +114,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
 
         mCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
-        mCameraView.setCvCameraViewListener(this);
+        mCameraView.setCvCameraViewListener(mCatDetector);
 
 
         timerHandler.postDelayed(timerRunnable, 3000);
@@ -182,8 +176,19 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     }
 
     public void buttonTrainCat1Pressed(View view) {
-        mTrainCat1 = !mTrainCat1;
-        mTrainCat1Button.setText(mTrainCat1? "Stop Training Cat 1": "Train Cat 1");
+        Log.d(TAG, "CAT TRAINING");
+
+
+        SharedPreferences sharedpreferences = getSharedPreferences(MyPREFERENCES, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedpreferences.edit();
+
+        mCatDetector.setCurrentHistogramAsCatHistogram(0);
+        editor.putString(PREFERENCES_CAT1_TRAIN, mCatDetector.getCatHistogram(0));
+
+
+
+        editor.commit();
+
     }
 
 
@@ -330,131 +335,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return intentFilter;
     }
 
-    BackgroundSubtractor mBackgroundSubstractor;
 
     @Override
-    public void onCameraViewStarted(int width, int height) {
-        mBackgroundSubstractor = Video.createBackgroundSubtractorKNN(100, 400, false);
-//        mBackgroundSubstractor = Video.createBackgroundSubtractorMOG2(50, 16, false);
-    }
-
-    @Override
-    public void onCameraViewStopped() {
+    public void onCatDetected(int index) {
+        mLastTimeCatSeen = System.currentTimeMillis();
 
     }
-
-
-    Mat cat1historam = null;
-
-    long lastFrameProcessed = System.currentTimeMillis();
-    long PROCESS_EVERY = 500;
-    Mat lastFrame = null;
-
-    static Mat calculateHist(Mat image, Mat mask) {
-        int channelsNumber = image.channels() - 1;
-        List<Mat> images = new ArrayList<Mat>(channelsNumber);
-        Core.split(image, images);
-
-
-        Mat hist3D = new Mat();
-        List<Mat> histList = Arrays.asList( new Mat[] {new Mat(), new Mat(), new Mat()} );
-
-        MatOfInt histSize = new MatOfInt(16);
-        MatOfFloat ranges = new MatOfFloat(0f, 256f);
-
-        for(int i=0; i<channelsNumber; i++)
-        {
-            Imgproc.calcHist(images, new MatOfInt(i), mask, histList.get(i), histSize, ranges);
-        }
-
-        Core.merge(histList, hist3D);
-//        Mat normalizedHist = new Mat();
-//        Core.normalize(hist3D, normalizedHist);
-
-        return hist3D;
-    }
-
-    boolean matchHist(Mat hist) {
-//        int channelsNumber = image.channels() - 1;
-//        List<Mat> hists = new ArrayList<Mat>(channelsNumber);
-//        Core.split(image, images);
-
-        double compResult = Imgproc.compareHist(cat1historam, hist, Imgproc.CV_COMP_CORREL);
-        Log.d(TAG, "CompResult: "+compResult);
-        return compResult>0.8;
-    }
-
-
-
-    @Override
-    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Mat orig = inputFrame.rgba();
-
-        if (!orig.isContinuous() || orig.empty()) {
-            return new Mat();
-        }
-        if (System.currentTimeMillis()<(lastFrameProcessed+PROCESS_EVERY)){
-            if (lastFrame!=null) {
-                return lastFrame;
-            } else {
-                return inputFrame.rgba();
-            }
-        }
-        lastFrameProcessed = System.currentTimeMillis();
-
-
-        Mat grey = inputFrame.gray();
-//        Mat blurred = new Mat(orig.size(), orig.type());
-//        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
-//        Mat equalized = new Mat(orig.size(), orig.type());
-
-//        Imgproc.equalizeHist(orig, equalized);
-
-        Mat mask = new Mat(grey.size(), grey.type());
-        mBackgroundSubstractor.apply(grey, mask);
-
-        Mat normalizedHist = calculateHist(orig, mask);
-
-        if (mTrainCat1) {
-            cat1historam = normalizedHist;
-
-            Log.d(TAG, "CAT TRAINING");
-
-
-            SharedPreferences sharedpreferences = getSharedPreferences(MyPREFERENCES, Context.MODE_PRIVATE);
-            SharedPreferences.Editor editor = sharedpreferences.edit();
-            try {
-                editor.putString(PREFERENCES_CAT1_TRAIN, SerializationUtils.matToJson(cat1historam));
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            editor.commit();
-
-
-        } else {
-            if (cat1historam != null) {
-                boolean catDetected = matchHist(normalizedHist);
-                Log.d(TAG, "CAT DETECTED: "+catDetected);
-
-                if (catDetected) {
-                    mLastTimeCatSeen = System.currentTimeMillis();
-                }
-            } else {
-                Log.d(TAG, "CAT CANNOT BE DETECTED, TRAIN FIRST");
-
-            }
-
-        }
-
-
-
-        Mat masked = new Mat(orig.size(), orig.type());
-        orig.copyTo(masked, mask);
-        lastFrame = masked;
-        return masked;
-    }
-
-
-
 }
