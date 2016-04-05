@@ -5,10 +5,7 @@ import android.content.SharedPreferences;
 import android.util.Log;
 import org.json.JSONException;
 import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfFloat;
-import org.opencv.core.MatOfInt;
+import org.opencv.core.*;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.video.BackgroundSubtractor;
 import org.opencv.video.Video;
@@ -72,8 +69,6 @@ public class CatDetector{
 
     Mat cat1historam = null;
 
-    long lastFrameProcessed = System.currentTimeMillis();
-    long PROCESS_EVERY = 500;
     Mat lastFrame = null;
 
     static Mat calculateHist(Mat image, Mat mask) {
@@ -123,16 +118,16 @@ public class CatDetector{
         Mat grey = new Mat();
 
         Imgproc.cvtColor(orig, grey, Imgproc.COLOR_BGR2GRAY);
-//        Mat blurred = new Mat(orig.size(), orig.type());
-//        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
+        Mat blurred = new Mat(orig.size(), orig.type());
+        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
 //        Mat equalized = new Mat(orig.size(), orig.type());
 
 //        Imgproc.equalizeHist(orig, equalized);
 
         Mat mask = new Mat(grey.size(), grey.type());
-        mBackgroundSubstractor.apply(grey, mask);
+        mBackgroundSubstractor.apply(blurred, mask);
 
-        mCurrentHistogram = calculateHist(orig, mask);
+        mCurrentHistogram = calculateHist(blurred, mask);
 
 
         if (cat1historam != null) {

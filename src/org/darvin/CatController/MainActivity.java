@@ -19,6 +19,7 @@ import android.widget.TextView;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.opencv.android.*;
 import org.opencv.core.Mat;
@@ -32,6 +33,8 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
     public Button mWaterButton;
     public Button mTrainCat1Button;
     public ImageView mPhotoView;
+
+    private int mTimerTimeout = 600;
 
     private long WATER_TIMEOUT = 3000;
     private long mLastTimeCatSeen = System.currentTimeMillis();
@@ -185,7 +188,7 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
             } else {
                 setWaterSwitch(true);
             }
-            timerHandler.postDelayed(this, 2000);
+            timerHandler.postDelayed(this, mTimerTimeout);
         }
     };
 
@@ -199,11 +202,32 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
             camera.enableShutterSound(false);
         }
 
+        Camera.Parameters params = camera.getParameters();
+
+        List<Camera.Size> sizes = params.getSupportedPictureSizes();
+
+        // Iterate through all available resolutions and choose one.
+        // The chosen resolution will be stored in mSize.
+        Camera.Size mSize = null;
+        for (Camera.Size size : sizes) {
+            Log.i(TAG, "Available resolution: "+size.width+" "+size.height);
+            if (mSize == null || (size.width>500 && size.width<700)) {
+                mSize = size;
+
+            }
+        }
+
+        Log.i(TAG, "Chosen resolution: "+mSize.width+" "+mSize.height);
+        params.setPictureSize(mSize.width, mSize.height);
+        params.setPreviewSize(mSize.width, mSize.height);
+        camera.setParameters(params);
+
         SurfaceTexture surfaceTexture = new SurfaceTexture(10);
         try {
             camera.setPreviewTexture(surfaceTexture);
         } catch (IOException e) {
             e.printStackTrace();
+            return;
         }
         camera.startPreview();
 
