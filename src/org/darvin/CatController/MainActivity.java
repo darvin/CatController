@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.SynchronousQueue;
 
+import org.json.JSONException;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
@@ -90,12 +91,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         SharedPreferences sharedpreferences = getSharedPreferences(MyPREFERENCES, Context.MODE_PRIVATE);
         mDeviceAddress = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_ADDRESS, null);
         mDeviceName = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
-        String cat1HistogramBase64 = sharedpreferences.getString(PREFERENCES_BLE_SWITCH_NAME, null);
+        String cat1HistogramBase64 = sharedpreferences.getString(PREFERENCES_CAT1_TRAIN, null);
         if (cat1HistogramBase64!=null) {
             try {
                 cat1historam = SerializationUtils.matFromJson(cat1HistogramBase64);
-            } catch (Exception e) {
-
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
         }
 
@@ -349,8 +350,49 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     long PROCESS_EVERY = 500;
     Mat lastFrame = null;
 
+    static Mat calculateHist(Mat image, Mat mask) {
+        int channelsNumber = image.channels() - 1;
+        List<Mat> images = new ArrayList<Mat>(channelsNumber);
+        Core.split(image, images);
+
+
+        Mat hist3D = new Mat();
+        List<Mat> histList = Arrays.asList( new Mat[] {new Mat(), new Mat(), new Mat()} );
+
+        MatOfInt histSize = new MatOfInt(16);
+        MatOfFloat ranges = new MatOfFloat(0f, 256f);
+
+        for(int i=0; i<channelsNumber; i++)
+        {
+            Imgproc.calcHist(images, new MatOfInt(i), mask, histList.get(i), histSize, ranges);
+        }
+
+        Core.merge(histList, hist3D);
+//        Mat normalizedHist = new Mat();
+//        Core.normalize(hist3D, normalizedHist);
+
+        return hist3D;
+    }
+
+    boolean matchHist(Mat hist) {
+//        int channelsNumber = image.channels() - 1;
+//        List<Mat> hists = new ArrayList<Mat>(channelsNumber);
+//        Core.split(image, images);
+
+        double compResult = Imgproc.compareHist(cat1historam, hist, Imgproc.CV_COMP_CORREL);
+        Log.d(TAG, "CompResult: "+compResult);
+        return compResult>0.8;
+    }
+
+
+
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        Mat orig = inputFrame.rgba();
+
+        if (!orig.isContinuous() || orig.empty()) {
+            return new Mat();
+        }
         if (System.currentTimeMillis()<(lastFrameProcessed+PROCESS_EVERY)){
             if (lastFrame!=null) {
                 return lastFrame;
@@ -359,7 +401,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
         }
         lastFrameProcessed = System.currentTimeMillis();
-        Mat orig = inputFrame.rgba();
+
+
         Mat grey = inputFrame.gray();
 //        Mat blurred = new Mat(orig.size(), orig.type());
 //        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
@@ -370,19 +413,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Mat mask = new Mat(grey.size(), grey.type());
         mBackgroundSubstractor.apply(grey, mask);
 
-
-        List<Mat> matList = new ArrayList<Mat>(Arrays.asList(orig));
-        Mat histogram = new Mat();
-        Imgproc.calcHist(
-                matList,
-                new MatOfInt(0,1,2),
-                mask,
-                histogram ,
-                new MatOfInt(8,8,8),
-                new MatOfFloat(0, 256, 0, 256, 0, 256));
-
-        Mat normalizedHist = new Mat();
-        Core.normalize(histogram, normalizedHist);
+        Mat normalizedHist = calculateHist(orig, mask);
 
         if (mTrainCat1) {
             cat1historam = normalizedHist;
@@ -394,18 +425,17 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             SharedPreferences.Editor editor = sharedpreferences.edit();
             try {
                 editor.putString(PREFERENCES_CAT1_TRAIN, SerializationUtils.matToJson(cat1historam));
-
-            } catch (Exception e) {
-
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
+
             editor.commit();
 
 
         } else {
             if (cat1historam != null) {
-                double compResult = Imgproc.compareHist(cat1historam, normalizedHist, Imgproc.CV_COMP_CORREL);
-                boolean catDetected = compResult>0.8;
-                Log.d(TAG, "CAT DETECTED: "+catDetected + " correlation: "+compResult);
+                boolean catDetected = matchHist(normalizedHist);
+                Log.d(TAG, "CAT DETECTED: "+catDetected);
 
                 if (catDetected) {
                     mLastTimeCatSeen = System.currentTimeMillis();

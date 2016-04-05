@@ -1,10 +1,14 @@
 package org.darvin.CatController;
 
 import android.util.Base64;
+import android.util.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
+import org.opencv.core.MatOfInt;
+import org.opencv.imgcodecs.Imgcodecs;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -15,6 +19,8 @@ import java.util.StringTokenizer;
  * Created by darvin on 4/3/16.
  */
 public class SerializationUtils {
+    private static final String TAG = "SerializationUtils";
+
     public static String matToJson(Mat mat) throws JSONException {
         JSONObject obj = new JSONObject();
         if(mat.isContinuous()){
@@ -36,7 +42,7 @@ public class SerializationUtils {
                 mat.get(0, 0, data);
                 dataString = new String(Base64.encode(SerializationUtils.toByteArray(data), Base64.DEFAULT));
             }
-            else if( type == CvType.CV_32F || type == CvType.CV_32FC2) {
+            else if( type == CvType.CV_32F || type == CvType.CV_32FC2 || type == CvType.CV_32FC3) {
                 float[] data = new float[cols * rows * elemSize];
                 mat.get(0, 0, data);
                 dataString = new String(Base64.encode(SerializationUtils.toByteArray(data), Base64.DEFAULT));
@@ -82,7 +88,7 @@ public class SerializationUtils {
             int[] data = SerializationUtils.toIntArray(Base64.decode(dataString.getBytes(), Base64.DEFAULT));
             mat.put(0, 0, data);
         }
-        else if( type == CvType.CV_32F || type == CvType.CV_32FC2) {
+        else if( type == CvType.CV_32F || type == CvType.CV_32FC2 || type == CvType.CV_32FC3) {
             float[] data = SerializationUtils.toFloatArray(Base64.decode(dataString.getBytes(), Base64.DEFAULT));
             mat.put(0, 0, data);
         }
