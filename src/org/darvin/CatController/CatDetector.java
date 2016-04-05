@@ -118,16 +118,16 @@ public class CatDetector{
         Mat grey = new Mat();
 
         Imgproc.cvtColor(orig, grey, Imgproc.COLOR_BGR2GRAY);
-        Mat blurred = new Mat(orig.size(), orig.type());
-        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
+//        Mat blurred = new Mat(orig.size(), orig.type());
+//        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
 //        Mat equalized = new Mat(orig.size(), orig.type());
 
 //        Imgproc.equalizeHist(orig, equalized);
 
         Mat mask = new Mat(grey.size(), grey.type());
-        mBackgroundSubstractor.apply(blurred, mask);
+        mBackgroundSubstractor.apply(grey, mask);
 
-        mCurrentHistogram = calculateHist(blurred, mask);
+        mCurrentHistogram = calculateHist(orig, mask);
 
 
         if (cat1historam != null) {

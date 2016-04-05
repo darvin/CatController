@@ -36,7 +36,7 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
 
     private int mTimerTimeout = 600;
 
-    private long WATER_TIMEOUT = 3000;
+    private long WATER_TIMEOUT = 30000;
     private long mLastTimeCatSeen = System.currentTimeMillis();
     private String MyPREFERENCES = "MyPREFERENCES";
     private String PREFERENCES_BLE_SWITCH_ADDRESS = "PREFERENCES_BLE_SWITCH_ADDRESS";
@@ -192,9 +192,13 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
         }
     };
 
+    boolean takingPicture = false;
 
     private void takePicture() {
-
+        if (takingPicture) {
+            return;
+        }
+        takingPicture = true;
         Camera camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
         Camera.CameraInfo info = new Camera.CameraInfo();
         Camera.getCameraInfo(Camera.CameraInfo.CAMERA_FACING_FRONT, info);
@@ -239,6 +243,7 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
                 final Bitmap bmp = BitmapFactory.decodeByteArray(data, 0, data.length, scalingOptions);
                 camera.stopPreview();
                 camera.release();
+                takingPicture = false;
                 Mat frameMat = new Mat();
                 Utils.bitmapToMat(bmp, frameMat);
 
