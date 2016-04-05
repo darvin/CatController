@@ -20,10 +20,11 @@ import java.util.List;
 /**
  * Created by darvin on 4/5/16.
  */
-public class CatDetector implements CameraBridgeViewBase.CvCameraViewListener2{
+public class CatDetector{
     private Mat mCurrentHistogram = null;
 
     public void setCurrentHistogramAsCatHistogram(int index) {
+
         cat1historam = mCurrentHistogram;
     }
 
@@ -42,6 +43,8 @@ public class CatDetector implements CameraBridgeViewBase.CvCameraViewListener2{
     BackgroundSubtractor mBackgroundSubstractor;
 
     public CatDetector(String cat1HistogramBase64) {
+        mBackgroundSubstractor = Video.createBackgroundSubtractorKNN(100, 400, false);
+
         setCatHistogram(cat1HistogramBase64, 0);
     }
 
@@ -65,16 +68,6 @@ public class CatDetector implements CameraBridgeViewBase.CvCameraViewListener2{
         }
     }
 
-    @Override
-    public void onCameraViewStarted(int width, int height) {
-        mBackgroundSubstractor = Video.createBackgroundSubtractorKNN(100, 400, false);
-//        mBackgroundSubstractor = Video.createBackgroundSubtractorMOG2(50, 16, false);
-    }
-
-    @Override
-    public void onCameraViewStopped() {
-
-    }
 
 
     Mat cat1historam = null;
@@ -119,24 +112,17 @@ public class CatDetector implements CameraBridgeViewBase.CvCameraViewListener2{
 
 
 
-    @Override
-    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Mat orig = inputFrame.rgba();
+    public Mat processFrame(Mat orig) {
 
-        if (!orig.isContinuous() || orig.empty()) {
+        if (!orig.isContinuous() || orig.empty() || orig.type()==-1) {
             return new Mat();
         }
-        if (System.currentTimeMillis()<(lastFrameProcessed+PROCESS_EVERY)){
-            if (lastFrame!=null) {
-                return lastFrame;
-            } else {
-                return inputFrame.rgba();
-            }
-        }
-        lastFrameProcessed = System.currentTimeMillis();
 
 
-        Mat grey = inputFrame.gray();
+
+        Mat grey = new Mat();
+
+        Imgproc.cvtColor(orig, grey, Imgproc.COLOR_BGR2GRAY);
 //        Mat blurred = new Mat(orig.size(), orig.type());
 //        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
 //        Mat equalized = new Mat(orig.size(), orig.type());

@@ -3,32 +3,25 @@ package org.darvin.CatController;
 import android.app.Activity;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.*;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ExpandableListView;
+import android.widget.ImageView;
 import android.widget.TextView;
 
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.SynchronousQueue;
 
-import org.json.JSONException;
-import org.opencv.android.BaseLoaderCallback;
-import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.LoaderCallbackInterface;
-import org.opencv.android.OpenCVLoader;
-import org.opencv.core.*;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.video.BackgroundSubtractor;
-import org.opencv.video.BackgroundSubtractorMOG2;
-import org.opencv.video.Video;
+import org.opencv.android.*;
+import org.opencv.core.Mat;
 
 public class MainActivity extends Activity implements CatDetector.OnCatDetectedListener {
     private static final String TAG = "MainActivity";
@@ -38,6 +31,7 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
 
     public Button mWaterButton;
     public Button mTrainCat1Button;
+    public ImageView mPhotoView;
 
     private long WATER_TIMEOUT = 3000;
     private long mLastTimeCatSeen = System.currentTimeMillis();
@@ -45,7 +39,6 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
     private String PREFERENCES_BLE_SWITCH_ADDRESS = "PREFERENCES_BLE_SWITCH_ADDRESS";
     private String PREFERENCES_BLE_SWITCH_NAME = "PREFERENCES_BLE_SWITCH_NAME";
     private String PREFERENCES_CAT1_TRAIN = "PREFERENCES_CAT1_TRAIN";
-    private CameraBridgeViewBase mCameraView;
     private CatDetector mCatDetector;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -58,7 +51,6 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
                     // Load native library after(!) OpenCV initialization
 //                    System.loadLibrary("cat_controller_opencv");
 
-                    mCameraView.enableView();
                 } break;
                 default:
                 {
@@ -84,6 +76,7 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
         waterStatusTextView = (TextView)findViewById(R.id.waterStatusTextView);
         mWaterButton = (Button) findViewById(R.id.buttonWaterTurnOn);
         mTrainCat1Button = (Button) findViewById(R.id.trainCat1Button);
+        mPhotoView = (ImageView) findViewById(R.id.photoView);
 
         Intent gattServiceIntent = new Intent(this, BLESwitchService.class);
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
@@ -102,19 +95,6 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
 //        List fpslist = param.getSupportedPreviewFpsRange();
 //        Log.d(TAG, "size= " + fpslist.size());
 
-
-        mCameraView = (CameraBridgeViewBase) findViewById(R.id.cameraView);
-        mCameraView.setCameraIndex(1);
-
-        int width = 800;
-        int height = 600;
-        mCameraView.setMaxFrameSize(width, height);
-//        mCameraView.getHolder().setFixedSize(900, 900);
-
-
-
-        mCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
-        mCameraView.setCvCameraViewListener(mCatDetector);
 
 
         timerHandler.postDelayed(timerRunnable, 3000);
@@ -156,8 +136,6 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
 
 
     public void buttonTurnOnPressed(View view) {
-        if (mCameraView != null)
-            mCameraView.disableView();
         timerHandler.removeCallbacks(timerRunnable);
 
         
@@ -201,14 +179,57 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
 
         @Override
         public void run() {
+            takePicture();
             if (System.currentTimeMillis()>(mLastTimeCatSeen+WATER_TIMEOUT)) {
                 setWaterSwitch(false);
             } else {
                 setWaterSwitch(true);
             }
-            timerHandler.postDelayed(this, 500);
+            timerHandler.postDelayed(this, 2000);
         }
     };
+
+
+    private void takePicture() {
+
+        Camera camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+        Camera.CameraInfo info = new Camera.CameraInfo();
+        Camera.getCameraInfo(Camera.CameraInfo.CAMERA_FACING_FRONT, info);
+        if (info.canDisableShutterSound) {
+            camera.enableShutterSound(false);
+        }
+
+        SurfaceTexture surfaceTexture = new SurfaceTexture(10);
+        try {
+            camera.setPreviewTexture(surfaceTexture);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        camera.startPreview();
+
+        camera.takePicture(null, null, new Camera.PictureCallback() {
+            @Override
+            public void onPictureTaken(byte[] data, Camera camera) {
+                BitmapFactory.Options scalingOptions = new BitmapFactory.Options();
+                scalingOptions.inSampleSize = camera.getParameters().getPictureSize().width / mPhotoView.getMeasuredWidth();
+                final Bitmap bmp = BitmapFactory.decodeByteArray(data, 0, data.length, scalingOptions);
+                camera.stopPreview();
+                camera.release();
+                Mat frameMat = new Mat();
+                Utils.bitmapToMat(bmp, frameMat);
+
+                Mat processedFrame = mCatDetector.processFrame(frameMat);
+                Bitmap newBitmap = Bitmap.createBitmap(processedFrame.cols(), processedFrame.rows(),
+                        Bitmap.Config.ARGB_8888);
+
+                Utils.matToBitmap(processedFrame, newBitmap);
+
+                mPhotoView.setImageBitmap(newBitmap);
+                mPhotoView.setVisibility(ImageView.VISIBLE);
+
+            }
+        });
+    }
 
 
     private String mDeviceName;
@@ -309,8 +330,6 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
         super.onPause();
         unregisterReceiver(mGattUpdateReceiver);
 
-        if (mCameraView != null)
-            mCameraView.disableView();
 
     }
 
@@ -320,8 +339,6 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
         unbindService(mServiceConnection);
         mBLESwitchService = null;
 
-        if (mCameraView != null)
-            mCameraView.disableView();
 
     }
 
