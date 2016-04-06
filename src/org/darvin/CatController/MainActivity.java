@@ -198,8 +198,13 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
         if (takingPicture) {
             return;
         }
-        takingPicture = true;
-        Camera camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+        Camera camera = null;
+        try {
+            camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+            takingPicture = true;
+        } catch (RuntimeException e) {
+            return;
+        }
         Camera.CameraInfo info = new Camera.CameraInfo();
         Camera.getCameraInfo(Camera.CameraInfo.CAMERA_FACING_FRONT, info);
         if (info.canDisableShutterSound) {
