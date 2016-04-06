@@ -109,28 +109,27 @@ public class CatDetector{
 
     public Mat processFrame(Mat orig) {
 
-        if (!orig.isContinuous() || orig.empty() || orig.type()==-1) {
+        if (!orig.isContinuous() || orig.empty() || orig.type()==-1 || mBackgroundSubstractor==null) {
             return new Mat();
         }
 
 
 
-        Mat grey = new Mat();
+//        Mat grey = new Mat();
 
-        Imgproc.cvtColor(orig, grey, Imgproc.COLOR_BGR2GRAY);
-//        Mat blurred = new Mat(orig.size(), orig.type());
-//        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
+//        Imgproc.cvtColor(orig, grey, Imgproc.COLOR_BGR2GRAY);
+        Mat blurred = new Mat(orig.size(), orig.type());
+        Imgproc.GaussianBlur(orig, blurred, new Size(21, 21), 0);
 //        Mat equalized = new Mat(orig.size(), orig.type());
 
 //        Imgproc.equalizeHist(orig, equalized);
 
-        Mat mask = new Mat(grey.size(), grey.type());
-        mBackgroundSubstractor.apply(grey, mask);
+        Mat mask = new Mat(orig.size(), orig.type());
+        mBackgroundSubstractor.apply(blurred, mask);
 
         mCurrentHistogram = calculateHist(orig, mask);
 
-
-        if (cat1historam != null) {
+        if (cat1historam != null && Core.countNonZero(mask)>0) {
             boolean catDetected = matchHist(mCurrentHistogram);
             Log.d(TAG, "CAT DETECTED: "+catDetected);
 
@@ -138,7 +137,10 @@ public class CatDetector{
                 mListener.onCatDetected(0);
             }
         } else {
-            Log.d(TAG, "CAT CANNOT BE DETECTED, TRAIN FIRST");
+            if (cat1historam == null) {
+                Log.d(TAG, "CAT CANNOT BE DETECTED, TRAIN FIRST");
+
+            }
 
         }
 
