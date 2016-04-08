@@ -34,7 +34,9 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
     public Button mTrainCat1Button;
     public ImageView mPhotoView;
 
-    private int mTimerTimeout = 600;
+    private int mTimerTimeout = 500;
+    private Camera camera;
+    SurfaceTexture surfaceTexture;
 
     private long WATER_TIMEOUT = 30000;
     private long mLastTimeCatSeen = System.currentTimeMillis();
@@ -99,6 +101,43 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
 //        Log.d(TAG, "size= " + fpslist.size());
 
 
+
+        camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+
+
+        Camera.CameraInfo info = new Camera.CameraInfo();
+        Camera.getCameraInfo(Camera.CameraInfo.CAMERA_FACING_FRONT, info);
+        if (info.canDisableShutterSound) {
+            camera.enableShutterSound(false);
+        }
+
+        Camera.Parameters params = camera.getParameters();
+
+        List<Camera.Size> sizes = params.getSupportedPictureSizes();
+
+        // Iterate through all available resolutions and choose one.
+        // The chosen resolution will be stored in mSize.
+        Camera.Size mSize = null;
+        for (Camera.Size size : sizes) {
+            Log.i(TAG, "Available resolution: "+size.width+" "+size.height);
+            if (mSize == null || (size.width>500 && size.width<700)) {
+                mSize = size;
+
+            }
+        }
+
+        Log.i(TAG, "Chosen resolution: "+mSize.width+" "+mSize.height);
+        params.setPictureSize(mSize.width, mSize.height);
+        params.setPreviewSize(mSize.width, mSize.height);
+        camera.setParameters(params);
+
+        surfaceTexture = new SurfaceTexture(10);
+        try {
+            camera.setPreviewTexture(surfaceTexture);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
 
         timerHandler.postDelayed(timerRunnable, 3000);
 
@@ -198,46 +237,10 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
         if (takingPicture) {
             return;
         }
-        Camera camera = null;
-        try {
-            camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
-            takingPicture = true;
-        } catch (RuntimeException e) {
-            return;
-        }
-        Camera.CameraInfo info = new Camera.CameraInfo();
-        Camera.getCameraInfo(Camera.CameraInfo.CAMERA_FACING_FRONT, info);
-        if (info.canDisableShutterSound) {
-            camera.enableShutterSound(false);
-        }
+        takingPicture = true;
 
-        Camera.Parameters params = camera.getParameters();
 
-        List<Camera.Size> sizes = params.getSupportedPictureSizes();
 
-        // Iterate through all available resolutions and choose one.
-        // The chosen resolution will be stored in mSize.
-        Camera.Size mSize = null;
-        for (Camera.Size size : sizes) {
-            Log.i(TAG, "Available resolution: "+size.width+" "+size.height);
-            if (mSize == null || (size.width>500 && size.width<700)) {
-                mSize = size;
-
-            }
-        }
-
-        Log.i(TAG, "Chosen resolution: "+mSize.width+" "+mSize.height);
-        params.setPictureSize(mSize.width, mSize.height);
-        params.setPreviewSize(mSize.width, mSize.height);
-        camera.setParameters(params);
-
-        SurfaceTexture surfaceTexture = new SurfaceTexture(10);
-        try {
-            camera.setPreviewTexture(surfaceTexture);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
         camera.startPreview();
 
         camera.takePicture(null, null, new Camera.PictureCallback() {
@@ -247,7 +250,6 @@ public class MainActivity extends Activity implements CatDetector.OnCatDetectedL
                 scalingOptions.inSampleSize = camera.getParameters().getPictureSize().width / mPhotoView.getMeasuredWidth();
                 final Bitmap bmp = BitmapFactory.decodeByteArray(data, 0, data.length, scalingOptions);
                 camera.stopPreview();
-                camera.release();
                 takingPicture = false;
                 Mat frameMat = new Mat();
                 Utils.bitmapToMat(bmp, frameMat);
